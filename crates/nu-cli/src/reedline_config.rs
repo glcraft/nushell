@@ -1356,11 +1356,17 @@ fn edit_from_record(
         Ok(ECD::CutTextObject) => EditCommand::CutTextObject {
             text_object: parse_text_object(record, config, span)?,
         },
+        Ok(ECD::AddTextObject) => EditCommand::AddTextObject {
+            text_object: parse_text_object_type(record, config, span)?,
+        },
         // The verb commands take a `MotionTarget` (and, for the operators, a
         // `Granularity`) parsed from the same record. See `parse_motion_target`.
         Ok(ECD::Move) => EditCommand::Move(parse_motion_target(record, config, span)?),
         Ok(ECD::Extend) => EditCommand::Extend(parse_motion_target(record, config, span)?),
         Ok(ECD::Select) => EditCommand::Select(parse_motion_target(record, config, span)?),
+        Ok(ECD::SelectTextObject) => {
+            EditCommand::SelectTextObject(parse_text_object(record, config, span)?)
+        }
         Ok(ECD::Erase) => EditCommand::Erase(parse_motion_target(record, config, span)?),
         Ok(ECD::Cut) => EditCommand::Cut {
             target: parse_motion_target(record, config, span)?,
@@ -1512,6 +1518,7 @@ pub(crate) fn display_edit_command(edit: EditCommandDiscriminants) -> Option<&'s
         ECD::CopyAroundPair => "CopyAroundPair left: <char>, right <char>",
         ECD::CutTextObject => "CutTextObject scope: <string>, object_type: <string>",
         ECD::CopyTextObject => "CopyTextObject scope: <string>, object_type: <string>",
+        ECD::AddTextObject => "AddTextObject object_type: <string>",
         ECD::Move => {
             "Move motion: <string>, direction: <string>, word_kind?: <string>, edge?: <string>, char?: <char>, stop?: <string>"
         }
@@ -1521,6 +1528,7 @@ pub(crate) fn display_edit_command(edit: EditCommandDiscriminants) -> Option<&'s
         ECD::Select => {
             "Select motion: <string>, direction: <string>, word_kind?: <string>, edge?: <string>, char?: <char>, stop?: <string>"
         }
+        ECD::SelectTextObject => "SelectTextObject scope: <string>, object_type: <string>",
         ECD::Erase => {
             "Erase motion: <string>, direction: <string>, word_kind?: <string>, edge?: <string>, char?: <char>, stop?: <string>"
         }
@@ -1577,7 +1585,17 @@ fn parse_text_object(
         },
     )?;
 
-    let object_type = extract_enum_field(
+    let object_type = parse_text_object_type(record, config, span)?;
+
+    Ok(TextObject { scope, object_type })
+}
+
+fn parse_text_object_type(
+    record: &Record,
+    config: &Config,
+    span: Span,
+) -> Result<TextObjectType, ShellError> {
+    extract_enum_field(
         "object_type",
         record,
         config,
@@ -1586,13 +1604,17 @@ fn parse_text_object(
         |name| match name {
             "word" => Some(TextObjectType::Word),
             "bigword" => Some(TextObjectType::BigWord),
-            "brackets" | "bracket" => Some(TextObjectType::Brackets),
-            "quote" | "quotes" => Some(TextObjectType::Quote),
+            "parenthesis" => Some(TextObjectType::Brackets(TextObjectBracket::Parenthesis)),
+            "square" => Some(TextObjectType::Brackets(TextObjectBracket::SquareBracket)),
+            "curly" => Some(TextObjectType::Brackets(TextObjectBracket::CurlyBracket)),
+            "angle" => Some(TextObjectType::Brackets(TextObjectBracket::AngleBracket)),
+            "single_quote" => Some(TextObjectType::Quotes(TextObjectQuote::SingleQuote)),
+            "double_quote" => Some(TextObjectType::Quotes(TextObjectQuote::DoubleQuote)),
+            "tick" => Some(TextObjectType::Quotes(TextObjectQuote::Tick)),
+            "quote" | "quotes" => Some(TextObjectType::Quotes(TextObjectQuote::All)),
             _ => None,
         },
-    )?;
-
-    Ok(TextObject { scope, object_type })
+    )
 }
 
 /// Read a lowercased string field from `record` and map it to an enum value,
