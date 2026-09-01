@@ -1390,34 +1390,6 @@ fn edit_from_record(
         Ok(ECD::CopySelectionSystem) => EditCommand::CopySelectionSystem,
         #[cfg(feature = "system-clipboard")]
         Ok(ECD::PasteSystem) => EditCommand::PasteSystem,
-        Ok(ECD::CutInsidePair) => {
-            let value = extract_value("left", record, span)?;
-            let left = extract_char(value)?;
-            let value = extract_value("right", record, span)?;
-            let right = extract_char(value)?;
-            EditCommand::CutInsidePair { left, right }
-        }
-        Ok(ECD::CopyInsidePair) => {
-            let value = extract_value("left", record, span)?;
-            let left = extract_char(value)?;
-            let value = extract_value("right", record, span)?;
-            let right = extract_char(value)?;
-            EditCommand::CopyInsidePair { left, right }
-        }
-        Ok(ECD::CutAroundPair) => {
-            let value = extract_value("left", record, span)?;
-            let left = extract_char(value)?;
-            let value = extract_value("right", record, span)?;
-            let right = extract_char(value)?;
-            EditCommand::CutAroundPair { left, right }
-        }
-        Ok(ECD::CopyAroundPair) => {
-            let value = extract_value("left", record, span)?;
-            let left = extract_char(value)?;
-            let value = extract_value("right", record, span)?;
-            let right = extract_char(value)?;
-            EditCommand::CopyAroundPair { left, right }
-        }
         Ok(ECD::CopyTextObject) => EditCommand::CopyTextObject {
             text_object: parse_text_object(record, config, span)?,
         },
@@ -1426,6 +1398,13 @@ fn edit_from_record(
         },
         Ok(ECD::AddTextObject) => EditCommand::AddTextObject {
             text_object: parse_text_object_type(record, config, span)?,
+        },
+        Ok(ECD::RemoveTextObject) => EditCommand::RemoveTextObject {
+            text_object: parse_text_object_type(record, config, span)?,
+        },
+        Ok(ECD::ReplaceTextObject) => EditCommand::ReplaceTextObject {
+            old: parse_text_object_type(record, config, span)?,
+            new: parse_text_object_type(record, config, span)?,
         },
         // The verb commands take a `MotionTarget` (and, for the operators, a
         // `Granularity`) parsed from the same record. See `parse_motion_target`.
@@ -1580,13 +1559,11 @@ pub(crate) fn display_edit_command(edit: EditCommandDiscriminants) -> Option<&'s
         ECD::CopySelectionSystem => "CopySelectionSystem",
         #[cfg(feature = "system-clipboard")]
         ECD::PasteSystem => "PasteSystem",
-        ECD::CutInsidePair => "CutInsidePair left: <char>, right <char>",
-        ECD::CopyInsidePair => "CopyInsidePair left: <char>, right <char>",
-        ECD::CutAroundPair => "CutAroundPair left: <char>, right <char>",
-        ECD::CopyAroundPair => "CopyAroundPair left: <char>, right <char>",
         ECD::CutTextObject => "CutTextObject scope: <string>, object_type: <string>",
         ECD::CopyTextObject => "CopyTextObject scope: <string>, object_type: <string>",
         ECD::AddTextObject => "AddTextObject object_type: <string>",
+        ECD::RemoveTextObject => "RemoveTextObject object_type: <string>",
+        ECD::ReplaceTextObject => "ReplaceTextObject old: <string>, new: <string>",
         ECD::Move => {
             "Move motion: <string>, direction: <string>, word_kind?: <string>, edge?: <string>, char?: <char>, stop?: <string>"
         }
@@ -1655,7 +1632,16 @@ fn parse_text_object(
 
     let object_type = parse_text_object_type(record, config, span)?;
 
-    Ok(TextObject { scope, object_type })
+    let check_next = match extract_value("check_next", record, span)? {
+        Value::Bool { val, .. } => *val,
+        _ => false,
+    };
+
+    Ok(TextObject {
+        scope,
+        object_type,
+        check_next,
+    })
 }
 
 fn parse_text_object_type(
@@ -1668,10 +1654,11 @@ fn parse_text_object_type(
         record,
         config,
         span,
-        "'word', 'bigword', 'brackets', or 'quote'",
+        "'word', 'bigword', 'brackets', 'parenthesis', 'square', 'curly', 'angle', 'quote', 'single_quote', 'double_quote', or 'tick'",
         |name| match name {
             "word" => Some(TextObjectType::Word),
             "bigword" => Some(TextObjectType::BigWord),
+            "brackets" => Some(TextObjectType::Brackets(TextObjectBracket::All)),
             "parenthesis" => Some(TextObjectType::Brackets(TextObjectBracket::Parenthesis)),
             "square" => Some(TextObjectType::Brackets(TextObjectBracket::SquareBracket)),
             "curly" => Some(TextObjectType::Brackets(TextObjectBracket::CurlyBracket)),
