@@ -15,9 +15,9 @@ use reedline::{
     EditCommandDiscriminants, FindStop, Granularity, IdeMenu, InputMode, Keybindings, ListMenu,
     Menu, MenuBuilder, MotionTarget, OutputMode, PromptEditMode, PromptEditModeDiscriminants,
     PromptHelixMode, PromptViMode, Reedline, ReedlineEvent, ReedlineEventDiscriminants,
-    ReedlineMenu, TextObject, TextObjectScope, TextObjectType, TraversalDirection, WordEdge,
-    WordKind, default_emacs_keybindings, default_vi_insert_keybindings,
-    default_vi_normal_keybindings, default_vi_visual_keybindings,
+    ReedlineMenu, TextObject, TextObjectBracket, TextObjectQuote, TextObjectScope, TextObjectType,
+    TraversalDirection, WordEdge, WordKind, default_emacs_keybindings,
+    default_vi_insert_keybindings, default_vi_normal_keybindings, default_vi_visual_keybindings,
 };
 use reedline::{
     default_helix_insert_keybindings, default_helix_normal_keybindings,
